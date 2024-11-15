@@ -27,3 +27,12 @@ To install and set up the Teltonika SDK, run the following command:
 ```bash
 sudo bash -c "$(curl -o- https://raw.githubusercontent.com/efthymios-tserepas/teltonica-sdk-setup/main/teltonica.sh)"
 
+## How to Build the SDK
+
+Once the script completes, navigate to the SDK folder and run the build command:
+
+```bash
+cd rutos-ipq40xx-rutx-sdk
+make
+
+Or, for more configuration options, you can use make menuconfig to customize the build before compiling.
