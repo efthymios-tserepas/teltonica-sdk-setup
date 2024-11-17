@@ -2,6 +2,9 @@
 
 set -e  # Exit immediately if a command exits with a non-zero status
 
+# Save the original username
+ORIGINAL_USER=$(logname)
+
 # Function to check if the script is running with sudo
 check_sudo() {
     if [ "$(id -u)" -ne 0 ]; then
@@ -55,6 +58,16 @@ install_packages() {
         "libexpat1-dev"            # Expat library
         "python3-distutils-extra"  # Python3 Distutils module
         "python-is-python3"        # Symlink 'python' to 'python3' if needed
+        "libtool"                  # Added libtool
+        "libtool-bin"              # Added libtool-bin
+        "libsemanage-dev"          # Added libsemanage-dev
+        "libc6-dev"                # Added libc6-dev
+        "libgmp-dev"               # Added libgmp-dev
+        "libmpc-dev"               # Added libmpc-dev
+        "libmpfr-dev"              # Added libmpfr-dev
+        "libelf-dev"               # Added libelf-dev
+        "bison"                    # Added bison
+        "flex"                     # Added flex
     )
 
     # Update package list
@@ -136,6 +149,11 @@ install_commands() {
         "gperf"
         "cmake"
         "curl"
+        "bison"
+        "flex"
+        "autoconf"
+        "automake"
+        "libtool"
     )
 
     # Install missing commands
@@ -172,6 +190,21 @@ install_commands() {
                     ;;
                 "python3")
                     apt-get install -y python3
+                    ;;
+                "bison")
+                    apt-get install -y bison
+                    ;;
+                "flex")
+                    apt-get install -y flex
+                    ;;
+                "autoconf")
+                    apt-get install -y autoconf
+                    ;;
+                "automake")
+                    apt-get install -y automake
+                    ;;
+                "libtool")
+                    apt-get install -y libtool libtool-bin
                     ;;
                 *)
                     echo "No specific package found for '$cmd'. Skipping."
@@ -239,7 +272,7 @@ download_sdk() {
 
     # Fix permissions
     echo "Fixing permissions for the SDK directory..."
-    chown -R "$USER:$USER" .
+    chown -R "$ORIGINAL_USER:$ORIGINAL_USER" .
     chmod -R 755 .
 
     # Check if 'scripts' folder exists
@@ -255,7 +288,7 @@ download_sdk() {
     echo "Executing the feeds for OpenWrt..."
     ./scripts/feeds update -a
     ./scripts/feeds install libffi lrexlib
-    #./scripts/feeds install -a
+    ./scripts/feeds install -a
 
     # Additional steps for ccache
     echo "Creating folder for ccache and downloading the package..."
