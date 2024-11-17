@@ -211,7 +211,7 @@ install_commands() {
                     ;;
             esac
         fi
-    done
+    done  # Προστέθηκε το 'done' εδώ
 }
 
 # Function to configure Git for longer timeouts and retries
@@ -288,7 +288,8 @@ download_sdk() {
     echo "Executing the feeds for OpenWrt..."
     ./scripts/feeds update -a
     ./scripts/feeds install libffi lrexlib
-  
+    ./scripts/feeds install -a
+
     # Additional steps for ccache
     echo "Creating folder for ccache and downloading the package..."
     mkdir -p tools/ccache
@@ -338,7 +339,7 @@ EOF
         git pull
     else
         echo "Cloning b43-tools repository..."
-        git clone https://git.openwrt.org/project/b43-tools.git .
+        git clone https://github.com/mbuesch/b43-tools.git .
     fi
 
     # Proceed to create the Makefile
@@ -349,7 +350,7 @@ include \$(TOPDIR)/rules.mk
 
 PKG_NAME:=b43-tools
 PKG_VERSION:=latest
-PKG_SOURCE_URL:=https://git.openwrt.org/project/b43-tools.git
+PKG_SOURCE_URL:=https://github.com/mbuesch/b43-tools.git
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_VERSION:=HEAD
 
