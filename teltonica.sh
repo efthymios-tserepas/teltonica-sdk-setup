@@ -255,7 +255,7 @@ download_sdk() {
     echo "Executing the feeds for OpenWrt..."
     ./scripts/feeds update -a
     ./scripts/feeds install libffi lrexlib
-    ./scripts/feeds install -a
+    #./scripts/feeds install -a
 
     # Additional steps for ccache
     echo "Creating folder for ccache and downloading the package..."
