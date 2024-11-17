@@ -288,6 +288,7 @@ download_sdk() {
     echo "Executing the feeds for OpenWrt..."
     ./scripts/feeds update -a
     ./scripts/feeds install libffi lrexlib
+    ./scripts/feeds install libtool libiconv expat libsemanage
     ./scripts/feeds install -a
 
     # Additional steps for ccache
