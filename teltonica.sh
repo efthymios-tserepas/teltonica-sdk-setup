@@ -46,7 +46,7 @@ install_packages() {
         "libzstd-dev"
         "make"
         "perl"
-        "libperl-dev"               # Added libperl-dev
+        "libperl-dev"
         "patch"
         "autoconf"
         "cmake"
@@ -55,19 +55,21 @@ install_packages() {
         "rsync"
         "jq"
         "curl"
-        "libexpat1-dev"            # Expat library
-        "python3-distutils-extra"  # Python3 Distutils module
-        "python-is-python3"        # Symlink 'python' to 'python3' if needed
-        "libtool"                  # Added libtool
-        "libtool-bin"              # Added libtool-bin
-        "libsemanage-dev"          # Added libsemanage-dev
-        "libc6-dev"                # Added libc6-dev
-        "libgmp-dev"               # Added libgmp-dev
-        "libmpc-dev"               # Added libmpc-dev
-        "libmpfr-dev"              # Added libmpfr-dev
-        "libelf-dev"               # Added libelf-dev
-        "bison"                    # Added bison
-        "flex"                     # Added flex
+        "libexpat1-dev"
+        "python3-distutils-extra"
+        "python-is-python3"
+        "libtool"
+        "libtool-bin"
+        "libsemanage-dev"
+        "libc6-dev"
+        "libgmp-dev"
+        "libmpc-dev"
+        "libmpfr-dev"
+        "libelf-dev"
+        "bison"
+        "flex"
+        "texinfo"
+        "zlib1g-dev"
     )
 
     # Update package list
@@ -154,6 +156,7 @@ install_commands() {
         "autoconf"
         "automake"
         "libtool"
+        "texinfo"
     )
 
     # Install missing commands
@@ -206,12 +209,15 @@ install_commands() {
                 "libtool")
                     apt-get install -y libtool libtool-bin
                     ;;
+                "texinfo")
+                    apt-get install -y texinfo
+                    ;;
                 *)
                     echo "No specific package found for '$cmd'. Skipping."
                     ;;
             esac
         fi
-    done  # Προστέθηκε το 'done' εδώ
+    done
 }
 
 # Function to configure Git for longer timeouts and retries
@@ -281,23 +287,25 @@ download_sdk() {
         exit 1
     fi
 
-    # Skip adding additional feeds to avoid duplicates
-    echo "Skipping addition of external feeds."
-
-    # Execute the feeds for OpenWrt
-    echo "Executing the feeds for OpenWrt..."
+    # Update feeds
+    echo "Updating feeds..."
     ./scripts/feeds update -a
-    ./scripts/feeds install libffi lrexlib
-    ./scripts/feeds install libtool libiconv expat libsemanage
-    ./scripts/feeds install -a
 
-    # Additional steps for ccache
-    echo "Creating folder for ccache and downloading the package..."
+    # Install specific packages via feeds
+    echo "Installing packages via feeds..."
+    ./scripts/feeds install libffi lrexlib
+
+    # (Optional) Install all packages from feeds if needed
+    # Be cautious as this may introduce unwanted dependencies
+    # ./scripts/feeds install -a
+
+    # Prepare ccache
+    echo "Preparing ccache..."
     mkdir -p tools/ccache
     cd tools/ccache
     wget https://github.com/ccache/ccache/releases/download/v4.9.1/ccache-4.9.1.tar.gz
 
-    echo "Creating the Makefile for ccache..."
+    # Create Makefile for ccache
     cat <<EOF > Makefile
 # tools/ccache/Makefile
 include \$(TOPDIR)/rules.mk
@@ -330,8 +338,8 @@ EOF
 
     cd ../..  # Return to the SDK root directory
 
-    # Additional steps for b43-tools
-    echo "Creating folder for b43-tools and downloading the package..."
+    # Prepare b43-tools
+    echo "Preparing b43-tools..."
     mkdir -p tools/b43-tools
     cd tools/b43-tools
 
@@ -343,16 +351,15 @@ EOF
         git clone https://github.com/mbuesch/b43-tools.git .
     fi
 
-    # Proceed to create the Makefile
-    echo "Creating the Makefile for b43-tools..."
+    # Create Makefile for b43-tools
     cat <<EOF > Makefile
 # tools/b43-tools/Makefile
 include \$(TOPDIR)/rules.mk
 
 PKG_NAME:=b43-tools
 PKG_VERSION:=latest
-PKG_SOURCE_URL:=https://github.com/mbuesch/b43-tools.git
 PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com/mbuesch/b43-tools.git
 PKG_SOURCE_VERSION:=HEAD
 
 include \$(INCLUDE_DIR)/package.mk
@@ -376,6 +383,16 @@ endef
 EOF
 
     cd ../..  # Return to the SDK root directory
+
+    # Fix permissions after modifications
+    echo "Fixing permissions for the SDK directory after modifications..."
+    chown -R "$ORIGINAL_USER:$ORIGINAL_USER" .
+    chmod -R 755 .
+
+    echo "The SDK is prepared. You can now run 'make menuconfig' to configure your build."
+    echo "Please run 'make menuconfig' and enable the required packages and tools."
+    echo "The process is complete! You can now continue with the firmware build."
+    echo "Run 'make menuconfig' to configure your build options."
 }
 
 # Function to display usage instructions
@@ -409,7 +426,8 @@ main() {
     # Download and prepare the SDK
     download_sdk
 
-    echo "The process is complete! You can now continue with the firmware build. You can run 'make' or 'make menuconfig'"
+    echo "The setup is complete! You can now proceed with the firmware build."
+    echo "Please run 'make menuconfig' inside the SDK directory to configure your build options."
 }
 
 # Start script execution and log output
