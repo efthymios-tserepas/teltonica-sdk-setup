@@ -70,6 +70,13 @@ install_packages() {
         "flex"
         "texinfo"
         "zlib1g-dev"
+        "lua5.3"
+        "liblua5.1-0-dev"
+        "luarocks"
+        "openjdk-11-jdk"
+        "ecj"  
+        "device-tree-compiler"
+        
     )
 
     # Update package list
@@ -91,6 +98,20 @@ install_packages() {
         apt-get install -y "${missing_packages[@]}"
     else
         echo "All required packages are already installed."
+    fi
+
+    # Ensure that the 'lua' symlink points to 'lua5.3'
+    if ! command -v lua &>/dev/null; then
+        ln -s /usr/bin/lua5.3 /usr/bin/lua
+        echo "Created symlink /usr/bin/lua -> /usr/bin/lua5.3"
+    fi
+
+    if [ ! -L /home/efthimis/rutos-ipq40xx-rutx-sdk/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/lua5.1-deb-multiarch.h ]; then
+         echo "Creating symlink for lua5.1-deb-multiarch.h..."
+         ln -s /usr/include/x86_64-linux-gnu/lua5.1-deb-multiarch.h /home/efthimis/rutos-ipq40xx-rutx-sdk/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/
+         echo "Symlink for lua5.1-deb-multiarch.h created successfully."
+    else
+         echo "Symlink for lua5.1-deb-multiarch.h already exists."
     fi
 }
 
@@ -288,12 +309,13 @@ download_sdk() {
     fi
 
     # Update feeds
-    echo "Updating feeds..."
-    ./scripts/feeds update -a
+    # echo "Updating feeds..."
+     ./scripts/feeds update -a
 
     # Install specific packages via feeds
-    echo "Installing packages via feeds..."
-    ./scripts/feeds install libffi lrexlib
+    #echo "Installing packages via feeds..."
+     ./scripts/feeds install libffi
+     ./scripts/feeds install libnetfilter-acct
 
     # (Optional) Install all packages from feeds if needed
     # Be cautious as this may introduce unwanted dependencies
@@ -427,7 +449,7 @@ main() {
     download_sdk
 
     echo "The setup is complete! You can now proceed with the firmware build."
-    echo "Please run 'make menuconfig' inside the SDK directory to configure your build options."
+    echo "Please run 'make menuconfig' inside the SDK directory to configure your build options or make for default build."
 }
 
 # Start script execution and log output
@@ -438,3 +460,4 @@ exec 2>&1
 echo "Starting the setup for Teltonika RUTX50 firmware build environment..."
 
 main "$@"
+
