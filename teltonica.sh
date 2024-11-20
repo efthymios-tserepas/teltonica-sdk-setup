@@ -73,7 +73,7 @@ install_packages() {
         "lua5.3"
         "liblua5.1-0-dev"
         "luarocks"
-        "openjdk-11-jdk"
+        "openjdk-17-jdk"
         "ecj"  
         "device-tree-compiler"
         
