@@ -5,6 +5,9 @@ set -e  # Exit immediately if a command exits with a non-zero status
 # Save the original username
 ORIGINAL_USER=$(logname)
 
+# Get the HOME directory for the user running the script
+USER_HOME=$(eval echo ~$ORIGINAL_USER)
+
 # Function to check if the script is running with sudo
 check_sudo() {
     if [ "$(id -u)" -ne 0 ]; then
@@ -74,9 +77,9 @@ install_packages() {
         "liblua5.1-0-dev"
         "luarocks"
         "openjdk-17-jdk"
-        "ecj"  
+        "ecj"
         "device-tree-compiler"
-        
+
     )
 
     # Update package list
@@ -106,13 +109,6 @@ install_packages() {
         echo "Created symlink /usr/bin/lua -> /usr/bin/lua5.3"
     fi
 
-    if [ ! -L /home/efthimis/rutos-ipq40xx-rutx-sdk/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/lua5.1-deb-multiarch.h ]; then
-         echo "Creating symlink for lua5.1-deb-multiarch.h..."
-         ln -s /usr/include/x86_64-linux-gnu/lua5.1-deb-multiarch.h /home/efthimis/rutos-ipq40xx-rutx-sdk/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/
-         echo "Symlink for lua5.1-deb-multiarch.h created successfully."
-    else
-         echo "Symlink for lua5.1-deb-multiarch.h already exists."
-    fi
 }
 
 # Function to install NodeJS 20.x
@@ -272,26 +268,40 @@ download_sdk() {
     echo "SDK URL: $SDK_URL"
     echo "SDK filename: $SDK_FILE"
 
-    # Download the SDK if not already downloaded
-    if [ -f "$SDK_FILE" ]; then
+    # Download the SDK to the user's home directory
+    DOWNLOAD_PATH="$USER_HOME/$SDK_FILE"
+
+    if [ -f "$DOWNLOAD_PATH" ]; then
         echo "SDK file already exists. Skipping download."
     else
-        if ! wget "$SDK_URL" -O "$SDK_FILE"; then
+        echo "Downloading SDK to $USER_HOME..."
+        if ! wget "$SDK_URL" -O "$DOWNLOAD_PATH"; then
+            echo "Failed to download the SDK. Exiting..."
+            exit 1
+        fi
+    fi
+
+    # Check if the downloaded file is valid (not corrupted)
+    if ! tar -tzf "$DOWNLOAD_PATH" &>/dev/null; then
+        echo "The downloaded SDK file is corrupted. Deleting it and downloading again..."
+        rm -f "$DOWNLOAD_PATH"
+        # Retry the download
+        if ! wget "$SDK_URL" -O "$DOWNLOAD_PATH"; then
             echo "Failed to download the SDK. Exiting..."
             exit 1
         fi
     fi
 
     # Extract the SDK directory name from the tarball
-    SDK_DIR=$(tar -tzf "$SDK_FILE" | head -1 | cut -f1 -d"/")
+    SDK_DIR=$(tar -tzf "$DOWNLOAD_PATH" | head -1 | cut -f1 -d"/")
 
     # Extract the SDK
     echo "Extracting the SDK..."
-    tar -xzf "$SDK_FILE"
+    tar -xzf "$DOWNLOAD_PATH" -C "$USER_HOME"
 
     # Change to the SDK directory
-    if [ -d "$SDK_DIR" ]; then
-        cd "$SDK_DIR"
+    if [ -d "$USER_HOME/$SDK_DIR" ]; then
+        cd "$USER_HOME/$SDK_DIR"
     else
         echo "SDK directory not found! Exiting..."
         exit 1
@@ -302,20 +312,40 @@ download_sdk() {
     chown -R "$ORIGINAL_USER:$ORIGINAL_USER" .
     chmod -R 755 .
 
+    # Create necessary directories and symbolic links after extracting SDK
+    if [ ! -d "$USER_HOME/$SDK_DIR/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/" ]; then
+        echo "Directory $USER_HOME/$SDK_DIR/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/ does not exist. Creating it..."
+        mkdir -p "$USER_HOME/$SDK_DIR/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/"
+        echo "Directory created successfully."
+    fi
+
+    # Check for the symbolic link and create it if it doesn't exist
+    if [ ! -L "$USER_HOME/$SDK_DIR/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/lua5.1-deb-multiarch.h" ]; then
+        echo "Creating symlink for lua5.1-deb-multiarch.h..."
+        ln -s /usr/include/x86_64-linux-gnu/lua5.1-deb-multiarch.h "$USER_HOME/$SDK_DIR/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/"
+        echo "Symlink for lua5.1-deb-multiarch.h created successfully."
+    else
+        echo "Symlink for lua5.1-deb-multiarch.h already exists."
+    fi
+
     # Check if 'scripts' folder exists
     if [ ! -d "./scripts" ]; then
         echo "'scripts' folder not found! Exiting..."
         exit 1
     fi
+}
+
+# Function to update feeds and install packages
+update_feeds_and_install() {
 
     # Update feeds
-    # echo "Updating feeds..."
-     ./scripts/feeds update -a
+    echo "Updating feeds..."
+    ./scripts/feeds update -a
 
     # Install specific packages via feeds
-    #echo "Installing packages via feeds..."
-     ./scripts/feeds install libffi
-     ./scripts/feeds install libnetfilter-acct
+    echo "Installing packages via feeds..."
+    ./scripts/feeds install libffi
+    ./scripts/feeds install libnetfilter-acct
 
     # (Optional) Install all packages from feeds if needed
     # Be cautious as this may introduce unwanted dependencies
@@ -329,6 +359,7 @@ download_sdk() {
 
     # Create Makefile for ccache
     cat <<EOF > Makefile
+
 # tools/ccache/Makefile
 include \$(TOPDIR)/rules.mk
 
@@ -375,6 +406,7 @@ EOF
 
     # Create Makefile for b43-tools
     cat <<EOF > Makefile
+
 # tools/b43-tools/Makefile
 include \$(TOPDIR)/rules.mk
 
@@ -448,6 +480,9 @@ main() {
     # Download and prepare the SDK
     download_sdk
 
+    # Update feeds and install packages
+    update_feeds_and_install
+
     echo "The setup is complete! You can now proceed with the firmware build."
     echo "Please run 'make menuconfig' inside the SDK directory to configure your build options or make for default build."
 }
@@ -460,4 +495,3 @@ exec 2>&1
 echo "Starting the setup for Teltonika RUTX50 firmware build environment..."
 
 main "$@"
-
