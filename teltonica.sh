@@ -105,8 +105,20 @@ install_packages() {
 
     # Ensure that the 'lua' symlink points to 'lua5.3'
     if ! command -v lua &>/dev/null; then
-        ln -s /usr/bin/lua5.3 /usr/bin/lua
-        echo "Created symlink /usr/bin/lua -> /usr/bin/lua5.3"
+        if command -v lua5.3 &>/dev/null; then
+            # Create symlink only if it doesn't already exist
+            if [ ! -L /usr/bin/lua ]; then
+                ln -s /usr/bin/lua5.3 /usr/bin/lua
+                echo "Created symlink /usr/bin/lua -> /usr/bin/lua5.3"
+            else
+                echo "Symlink /usr/bin/lua already exists."
+            fi
+        else
+            echo "lua5.3 is not installed on the system. Cannot create symlink."
+            exit 1
+        fi
+    else
+        echo "Lua symlink already exists and points to: $(readlink /usr/bin/lua)"
     fi
 
 }
@@ -242,12 +254,14 @@ configure_git() {
     echo "Configuring Git to allow longer timeouts and retries..."
 
     # Increase the timeout to avoid interruptions
-    git config --global http.lowSpeedLimit 0
-    git config --global http.lowSpeedTime 999999
+    git config --global http.lowSpeedLimit 1
+    git config --global http.lowSpeedTime 60
 
     # Allow Git to retry in case of failure
-    git config --global fetch.retries 5
-    git config --global http.postBuffer 524288000  # 500MB buffer for Git
+    git config --global fetch.retries 3
+    
+    # Buffer = 100MB
+    git config --global http.postBuffer 104857600
 }
 
 # Function to download the SDK and perform additional setup
