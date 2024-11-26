@@ -21,6 +21,11 @@ ORIGINAL_USER=$(logname)
 # Get the HOME directory for the user running the script
 USER_HOME=$(eval echo ~$ORIGINAL_USER)
 
+# Initialize progress
+TOTAL_STEPS=7
+CURRENT_STEP=0
+PROGRESS=0
+
 # Function to display the welcome message
 display_welcome() {
     # Install figlet if not installed
@@ -35,10 +40,6 @@ display_welcome() {
     echo -e "${BLUE}Now beginning installation of dependencies for building Teltonika SDK firmware.${NC}"
 }
 
-# Initialize progress
-TOTAL_STEPS=7
-CURRENT_STEP=0
-
 # Function to display progress bar
 display_progress_bar() {
     BAR_WIDTH=50
@@ -46,11 +47,8 @@ display_progress_bar() {
     EMPTY_WIDTH=$((BAR_WIDTH - FILLED_WIDTH))
     FILLED_BAR=$(printf "%${FILLED_WIDTH}s" | tr ' ' '#')
     EMPTY_BAR=$(printf "%${EMPTY_WIDTH}s" | tr ' ' '.')
-    # Move cursor to the beginning of the line and clear the line
-    printf "\r\033[K${MAGENTA}Progress: [${FILLED_BAR}${EMPTY_BAR}] ${PROGRESS}%%${NC}"
-    if [ "$PROGRESS" -eq 100 ]; then
-        echo ""
-    fi
+    # Print progress bar on a new line
+    printf "${MAGENTA}Progress: [${FILLED_BAR}${EMPTY_BAR}] ${PROGRESS}%%${NC}\n"
 }
 
 # Function to update progress
@@ -257,7 +255,6 @@ install_commands() {
         "autoconf"
         "automake"
         "libtool"
-        # Removed "ncurses", "expat", "texinfo" as they are not commands
     )
 
     # Install missing commands
@@ -382,10 +379,11 @@ download_sdk() {
     tar -xzf "$DOWNLOAD_PATH" -C "$USER_HOME"
     echo -e "${GREEN}${CHECK_MARK}${NC}"
 
-    # Change to the SDK directory
+    # Change to the SDK directory and set SDK_PATH
     SDK_DIR=$(tar -tzf "$DOWNLOAD_PATH" | head -1 | cut -f1 -d"/")
     if [ -d "$USER_HOME/$SDK_DIR" ]; then
-        cd "$USER_HOME/$SDK_DIR"
+        SDK_PATH="$USER_HOME/$SDK_DIR"
+        cd "$SDK_PATH"
     else
         echo -e "${RED}${CROSS_MARK} SDK directory not found! Exiting...${NC}"
         exit 1
@@ -393,28 +391,28 @@ download_sdk() {
 
     # Fix permissions
     echo -n "Fixing permissions... "
-    chown -R "$ORIGINAL_USER:$ORIGINAL_USER" .
-    chmod -R 755 .
+    chown -R "$ORIGINAL_USER:$ORIGINAL_USER" "$SDK_PATH"
+    chmod -R 755 "$SDK_PATH"
     echo -e "${GREEN}${CHECK_MARK}${NC}"
 
     # Create necessary directories and symbolic links after extracting SDK
-    if [ ! -d "$USER_HOME/$SDK_DIR/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/" ]; then
+    if [ ! -d "$SDK_PATH/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/" ]; then
         echo -n "Creating required directories... "
-        mkdir -p "$USER_HOME/$SDK_DIR/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/"
+        mkdir -p "$SDK_PATH/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/"
         echo -e "${GREEN}${CHECK_MARK}${NC}"
     fi
 
     # Check for the symbolic link and create it if it doesn't exist
-    if [ ! -L "$USER_HOME/$SDK_DIR/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/lua5.1-deb-multiarch.h" ]; then
+    if [ ! -L "$SDK_PATH/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/lua5.1-deb-multiarch.h" ]; then
         echo -n "Creating symlink for lua5.1-deb-multiarch.h... "
-        ln -s /usr/include/x86_64-linux-gnu/lua5.1-deb-multiarch.h "$USER_HOME/$SDK_DIR/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/"
+        ln -s /usr/include/x86_64-linux-gnu/lua5.1-deb-multiarch.h "$SDK_PATH/staging_dir/target-arm_cortex-a7+neon-vfpv4_musl_eabi/usr/include/"
         echo -e "${GREEN}${CHECK_MARK}${NC}"
     else
         echo -e "${YELLOW}Symlink for lua5.1-deb-multiarch.h already exists.${NC}"
     fi
 
     # Check if 'scripts' folder exists
-    if [ ! -d "./scripts" ]; then
+    if [ ! -d "$SDK_PATH/scripts" ]; then
         echo -e "${RED}${CROSS_MARK} 'scripts' folder not found! Exiting...${NC}"
         exit 1
     fi
@@ -426,6 +424,9 @@ download_sdk() {
 update_feeds_and_install() {
     echo -e "${BLUE}Updating feeds and installing packages...${NC}"
     echo -e "${YELLOW}Please be patient, this process may take a while.${NC}"
+
+    # Ensure we are in the SDK directory
+    cd "$SDK_PATH"
 
     # Update feeds
     echo -n "Updating feeds... "
@@ -440,8 +441,8 @@ update_feeds_and_install() {
 
     # Prepare ccache
     echo "Preparing ccache..."
-    mkdir -p tools/ccache
-    cd tools/ccache
+    mkdir -p "$SDK_PATH/tools/ccache"
+    cd "$SDK_PATH/tools/ccache"
     wget https://github.com/ccache/ccache/releases/download/v4.9.1/ccache-4.9.1.tar.gz >/dev/null 2>&1
 
     # Create Makefile for ccache
@@ -475,12 +476,12 @@ endef
 \$(eval \$(call BuildPackage,ccache))
 EOF
 
-    cd ../..  # Return to the SDK root directory
+    cd "$SDK_PATH"  # Return to the SDK directory
 
     # Prepare b43-tools
     echo "Preparing b43-tools..."
-    mkdir -p tools/b43-tools
-    cd tools/b43-tools
+    mkdir -p "$SDK_PATH/tools/b43-tools"
+    cd "$SDK_PATH/tools/b43-tools"
 
     if [ -d ".git" ]; then
         echo -n "Updating b43-tools repository... "
@@ -523,18 +524,19 @@ endef
 \$(eval \$(call BuildPackage,b43-tools))
 EOF
 
-    cd ../..  # Return to the SDK root directory
+    cd "$SDK_PATH"  # Return to the SDK directory
 
     # Fix permissions after modifications
     echo -n "Fixing permissions after modifications... "
-    chown -R "$ORIGINAL_USER:$ORIGINAL_USER" .
-    chmod -R 755 .
+    chown -R "$ORIGINAL_USER:$ORIGINAL_USER" "$SDK_PATH"
+    chmod -R 755 "$SDK_PATH"
     echo -e "${GREEN}${CHECK_MARK}${NC}"
 
     echo "The SDK is prepared. You can now run 'make menuconfig' to configure your build."
     echo "Please run 'make menuconfig' and enable the required packages and tools."
     echo "The process is complete! You can now continue with the firmware build."
     echo "Run 'make menuconfig' to configure your build options."
+
     update_progress
 }
 
